@@ -4,23 +4,113 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Assistente de Laudos — IML-AL</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', system-ui, sans-serif; }
-    .block-output { white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; }
-    .mic-ativo { animation: pulse 1.2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #f3f4f6; color: #1f2937; min-height: 100vh; }
+    .container { max-width: 680px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.1rem; font-weight: 700; }
+    .subtitle { font-size: 0.8rem; color: #6b7280; margin-bottom: 16px; }
+    hr { border: none; border-top: 1px solid #d1d5db; margin: 12px 0 16px; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    input[type=password], textarea {
+      width: 100%; border: 1px solid #d1d5db; border-radius: 6px;
+      padding: 8px 10px; font-size: 0.85rem; font-family: inherit;
+      outline: none; background: #fff;
+    }
+    input[type=password]:focus, textarea:focus { border-color: #6366f1; }
+    .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .btn {
+      padding: 6px 14px; border-radius: 6px; border: 1px solid #9ca3af;
+      background: #fff; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+      color: #374151; transition: background 0.15s;
+    }
+    .btn:hover { background: #f9fafb; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-primary {
+      display: block; width: 100%; padding: 11px; margin: 14px 0;
+      background: #1f2937; color: #fff; border: none; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-primary:hover { background: #111827; }
+    .btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .btn-mic-on { background: #dc2626; color: #fff; border-color: #b91c1c; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .erro { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px 12px; font-size: 0.8rem; color: #991b1b; margin-bottom: 12px; }
+    .blocos { margin-top: 4px; }
+    .bloco { border: 1px solid #d1d5db; border-radius: 8px; background: #fff; margin-bottom: 14px; }
+    .bloco-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #d1d5db; border-radius: 8px 8px 0 0; }
+    .bloco-titulo { font-size: 0.7rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+    .bloco textarea { border: none; border-radius: 0 0 8px 8px; padding: 10px 12px; font-size: 0.82rem; line-height: 1.6; white-space: pre-wrap; resize: vertical; }
+    .bloco textarea:focus { border: none; outline: none; }
+    .resultado-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .resultado-titulo { font-size: 0.9rem; font-weight: 700; }
+    .footer { margin-top: 20px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 0.7rem; color: #9ca3af; text-align: center; }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-<div id="root"></div>
+<body>
+<div class="container">
+  <h1>Assistente de Laudos Periciais</h1>
+  <p class="subtitle">IML Est&#225;cio de Lima &#8212; Macei&#243;-AL</p>
+  <hr>
 
-<script type="text/babel">
-const { useState, useRef, useEffect } = React;
+  <div style="margin-bottom:14px">
+    <label for="apikey">Chave de API Anthropic</label>
+    <input type="password" id="apikey" placeholder="sk-ant-..." autocomplete="off" />
+  </div>
 
+  <div style="margin-bottom:12px">
+    <div class="row">
+      <label for="contexto" style="margin:0">Contexto do Exame</label>
+      <button class="btn" id="btnMic" onclick="toggleVoz()">Ditar por voz</button>
+    </div>
+    <textarea id="contexto" rows="8" placeholder="Digite ou dite o contexto do exame: tipo de exame, idade, hist&#243;rico relatado, achados do exame f&#237;sico, e demais informa&#231;&#245;es relevantes..." style="margin-top:6px"></textarea>
+  </div>
+
+  <div id="erro" class="erro" style="display:none"></div>
+
+  <button class="btn-primary" id="btnGerar" onclick="gerar()">Gerar Minuta</button>
+
+  <div id="resultado" style="display:none">
+    <div class="resultado-header">
+      <span class="resultado-titulo">Minuta Gerada</span>
+      <button class="btn" onclick="copiarTudo()">Copiar os 4 campos</button>
+    </div>
+    <div class="blocos">
+      <div class="bloco">
+        <div class="bloco-header">
+          <span class="bloco-titulo">Hist&#243;rico</span>
+          <button class="btn" onclick="copiar('historico')">Copiar</button>
+        </div>
+        <textarea id="historico" rows="4" oninput="ajustarAltura(this)"></textarea>
+      </div>
+      <div class="bloco">
+        <div class="bloco-header">
+          <span class="bloco-titulo">Exame M&#233;dico</span>
+          <button class="btn" onclick="copiar('exame')">Copiar</button>
+        </div>
+        <textarea id="exame" rows="4" oninput="ajustarAltura(this)"></textarea>
+      </div>
+      <div class="bloco">
+        <div class="bloco-header">
+          <span class="bloco-titulo">Discuss&#227;o</span>
+          <button class="btn" onclick="copiar('discussao')">Copiar</button>
+        </div>
+        <textarea id="discussao" rows="4" oninput="ajustarAltura(this)"></textarea>
+      </div>
+      <div class="bloco">
+        <div class="bloco-header">
+          <span class="bloco-titulo">Conclus&#227;o</span>
+          <button class="btn" onclick="copiar('conclusao')">Copiar</button>
+        </div>
+        <textarea id="conclusao" rows="4" oninput="ajustarAltura(this)"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Uso exclusivo para apoio &#224; reda&#231;&#227;o t&#233;cnica. O perito &#233; respons&#225;vel pela revis&#227;o e assinatura do laudo.</div>
+</div>
+
+<script>
 const SYSTEM_PROMPT = `Você é um assistente especializado em medicina legal brasileira. Sua função é auxiliar médicos legistas do IML Estácio de Lima (Maceió-AL) na redação técnica de laudos periciais. Use linguagem técnico-jurídica precisa, impessoal e objetiva. Nunca invente achados clínicos. Quando os dados fornecidos forem insuficientes para uma conclusão, declare explicitamente: sem elementos para afirmar ou negar. Siga as diretrizes do CFM e da ABML para laudos periciais.
 
 ESTILO DA INSTITUIÇÃO — siga rigorosamente estes padrões de redação, extraídos de laudos reais do perito:
@@ -47,7 +137,7 @@ Sempre dividir em duas seções: "Inspeção externa:" e "Inspeção interna:".
 
 Inspeção externa — três subseções obrigatórias, nesta ordem:
 1. "- Elementos de identidade:" — cor, sexo, cabelos, olhos, estado de nutrição/decomposição, vestimentas.
-2. "- Sinais de morte:" — descrever detalhadamente o fenômeno cadavérico presente, conforme o estado do corpo. Usar as descrições abaixo conforme o caso:
+2. "- Sinais de morte:" — descrever detalhadamente o fenômeno cadavérico presente, conforme o estado do corpo:
    • Corpo fresco/recente: "com resfriamento cutâneo, midríase paralítica, livores de hipóstases fixos nas partes posteriores do corpo, rigidez cadavérica generalizada."
    • Putrefação gasosa: "corpo no período gasoso da putrefação, cabeça de cor anegrada, protusão orbital, protusão da língua, descolamento da epiderme, enfisemas subcutâneos, numerosas flictenas de conteúdo seroso, mancha verde abdominal em fossas ilíacas, aumento do volume do pênis e da bolsa escrotal, protusão retal."
    • Putrefação avançada/liquefação: "corpo em avançado estado de putrefação, predominando a fase de liquefação. Apresenta coloração geral castanho escurecida, grande quantidade de vermes, pele amplamente destacada e extremamente friável, com áreas extensas de maceração úmida e brilho por líquido putrefativo. Abdome globoso por gases, com regiões esverdeadas e escurecidas e pontos de derreamento de tecidos moles. Membros superiores e inferiores com destacamento epidérmico difuso, afinamento dos planos musculares e deformidade própria da decomposição. Genitália externa tumefeita e alterada pela putrefação, com extravasamento de líquido na região perineal. Extremidades com perda de contornos e fragmentação tecidual. Odor pútrido intenso."
@@ -55,26 +145,21 @@ Inspeção externa — três subseções obrigatórias, nesta ordem:
 3. "- Ectoscopia:" — lesões externas numeradas e descritas. Se ausentes: "Não apresenta lesões externas visíveis."
 
 Inspeção interna — sempre incluir a técnica antes dos achados:
-Técnica padrão completa (craniana + abdominotorácica): "Técnica: cavidade craniana: foi realizada incisão bimastoidea, rebatido o couro cabeludo para anterior e posterior. Cavidade abdominotorácica: foi realizada incisão manúbrio-pubiana, desviada a esquerda da cicatriz umbilical, dissecada a musculatura peitoral e rebatida lateralmente, aberta a cavidade abdominal pela linha \"Alba\", seccionadas as costelas, retirado o plastrão condro-esternal e aberta a cavidade torácica."
-Técnica só craniana (quando indicado): "Técnica: cavidade craniana: foi realizada incisão bimastoidea, rebatido o couro cabeludo para anterior e posterior."
-Depois da técnica: "Realizada a inspeção sistematizada, observou o perito: Cavidade craniana: [achados]. Cavidade abdominotorácica: [achados]."
+Técnica padrão completa: "Técnica: cavidade craniana: foi realizada incisão bimastoidea, rebatido o couro cabeludo para anterior e posterior. Cavidade abdominotorácica: foi realizada incisão manúbrio-pubiana, desviada a esquerda da cicatriz umbilical, dissecada a musculatura peitoral e rebatida lateralmente, aberta a cavidade abdominal pela linha Alba, seccionadas as costelas, retirado o plastrão condro-esternal e aberta a cavidade torácica."
+Depois: "Realizada a inspeção sistematizada, observou o perito: Cavidade craniana: [achados]. Cavidade abdominotorácica: [achados]."
 
 DISCUSSÃO — estrutura obrigatória:
-A discussão SEMPRE começa com dois elementos, nesta ordem, antes de qualquer outra consideração:
-  1. O relato da vítima: "Periciada relata que foi vítima de agressão sexual." OU "Periciada nega agressão sexual." — conforme o que foi informado.
-  2. O achado do exame físico relevante: ex. "O hímen está íntegro." / "Houve conjunção carnal." / "Não houve conjunção carnal." / "Há rotura himenal recente." / "Há rotura himenal antiga." / "Não foram encontrados vestígios de ato libidinoso." — conforme o achado descrito no exame.
+A discussão SEMPRE começa com dois elementos, nesta ordem:
+  1. O relato da vítima: "Periciada relata que foi vítima de agressão sexual." OU "Periciada nega agressão sexual."
+  2. O achado do exame físico: "O hímen está íntegro." / "Houve conjunção carnal." / "Não houve conjunção carnal." / "Há rotura himenal recente." / "Há rotura himenal antiga." / "Não foram encontrados vestígios de ato libidinoso."
 Somente após esses dois elementos seguem as demais considerações periciais.
 
 - Tempo decorrido: "Diante do tempo transcorrido entre o evento descrito e o exame atual, o perito não tem como identificar, hoje, possíveis vestígios de [ato] que pudessem existir no dia em que aconteceu o fato. Desta forma não foram colhidos materiais para exame. Entretanto, vale salientar que alguns atos libidinosos, a exemplo do descrito no histórico, podem ocorrer sem deixar vestígios."
-- Hímen complacente: "Diante da existência de hímen complacente, que permite a conjunção carnal sem se romper, e ausência de sinais externos de agressão, fica o perito sem elementos para afirmar ou negar a existência de conjunção carnal ou outro ato libidinoso."
-- Hímen íntegro: "o hímen é uma estrutura elástica, em determinadas situações pode ocorrer a penetração sem este se romper"
 - Coleta com encaminhamento: "Houve a coleta de swabs e estes foram devidamente protocolados e encaminhados ao laboratório de genética do Instituto de Criminalística para seguimento propedêutico através da pesquisa de espermatozoides, PSA e teste de DNA no intuito de encontrar vestígios de ato sexual que possam confirmar relação recente e identificar o agressor."
-- Pendência laboratorial: "A conclusão do laudo fica na dependência dos resultados dos exames solicitados."
-- Compatibilidade em lesão corporal: "Periciando refere agressão física. As lesões observadas são compatíveis com o tempo e o instrumento contundente descritos no histórico."
-- Gravidez: "A gravidez, por si só, já evidencia a conjunção carnal."
+- Compatibilidade lesão corporal: "Periciando refere agressão física. As lesões observadas são compatíveis com o tempo e o instrumento contundente descritos no histórico."
 
-GESTANTE (exame sexual) — quando a periciada estiver grávida, usar OBRIGATORIAMENTE:
-- EXAME: "Periciada em bom estado geral, abdome gravídico [ou não gravídico, conforme informado], exame ginecológico não realizado." (não descrever exame interno)
+GESTANTE (exame sexual) — usar OBRIGATORIAMENTE quando a periciada estiver grávida:
+- EXAME: "Periciada em bom estado geral, abdome gravídico, exame ginecológico não realizado."
 - DISCUSSÃO: "Há relato de violência sexual. A periciada está grávida. O tempo gestacional é condizente com o descrito no histórico. A gravidez, por si só já evidencia a conjunção carnal. Após resolução da gestação, solicito coleta do material do fruto da concepção para que seja encaminhado ao Laboratório de Genética Forense no intuito de determinar a autoria do fato. Devido aos exames complementares caracterizando a gravidez, o tempo em que houve a agressão e o relato de vida sexual ativa da vítima, o exame ginecológico torna-se desnecessário e não foi realizado."
 - CONCLUSÃO: "Periciada foi vítima de agressão sexual e está grávida. Tem [idade] de idade. A presença da gravidez configura a prática da conjunção carnal. Aguardo resolução da gestação para coleta de material genético do fruto da concepção para ser encaminhado ao laboratório forense para fins de identificação do agressor."
 
@@ -87,8 +172,60 @@ CONCLUSÃO — curta e direta:
 
 Vocabulário fixo: pericianda/periciada (fem.), periciando/periciado (masc.), "constata o perito", "de interesse médico legal", "instrumento contundente / perfurocontundente / cortocontundente", "sem elementos para afirmar ou negar", "prejudicado".`;
 
+// Persistência da chave
+const input = document.getElementById('apikey');
+input.value = localStorage.getItem('iml_api_key') || '';
+input.addEventListener('input', () => localStorage.setItem('iml_api_key', input.value));
+
+// Voz
+let rec = null;
+let gravando = false;
+const suportaVoz = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+if (!suportaVoz) document.getElementById('btnMic').style.display = 'none';
+
+function toggleVoz() {
+  if (gravando) { rec && rec.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  rec = new SR();
+  rec.lang = 'pt-BR';
+  rec.continuous = true;
+  rec.interimResults = false;
+  rec.onresult = (e) => {
+    let novo = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) novo += e.results[i][0].transcript + ' ';
+    }
+    if (novo) {
+      const t = document.getElementById('contexto');
+      t.value = (t.value ? t.value + ' ' : '') + novo.trim();
+    }
+  };
+  rec.onend = () => { gravando = false; atualizarBtnMic(); };
+  rec.onerror = (e) => {
+    gravando = false; atualizarBtnMic();
+    if (e.error !== 'aborted') mostrarErro('Erro no ditado: ' + e.error);
+  };
+  rec.start();
+  gravando = true;
+  atualizarBtnMic();
+  limparErro();
+}
+
+function atualizarBtnMic() {
+  const btn = document.getElementById('btnMic');
+  btn.textContent = gravando ? 'Parar ditado' : 'Ditar por voz';
+  btn.classList.toggle('btn-mic-on', gravando);
+}
+
+function mostrarErro(msg) {
+  const el = document.getElementById('erro');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function limparErro() { document.getElementById('erro').style.display = 'none'; }
+
 function montarPrompt(contexto) {
-  return `O perito fornece abaixo o contexto livre de um exame pericial (pode incluir tipo de exame, histórico, achados de exame físico e demais informações):
+  return `O perito fornece abaixo o contexto livre de um exame pericial:
 
 """
 ${contexto}
@@ -97,243 +234,127 @@ ${contexto}
 Com base EXCLUSIVAMENTE nas informações fornecidas, redija a minuta do laudo dividida nos 4 campos do sistema do IML, usando exatamente estes marcadores:
 
 ===HISTORICO===
-[Texto do histórico: relato sucinto e impessoal das circunstâncias informadas, em terceira pessoa. Ex: "Periciada X anos, veio a este serviço após..."]
+[texto]
 
 ===EXAME===
-[Texto do exame médico: descrição objetiva dos achados do exame físico informados pelo perito, em terminologia médico-legal.]
+[texto]
 
 ===DISCUSSAO===
-[Discussão médico-legal: correlação entre o histórico e os achados, considerações sobre tempo decorrido, vestígios e limitações da perícia.]
+[texto]
 
 ===CONCLUSAO===
-[Conclusão objetiva e sintética, compatível com a discussão.]
+[texto]
 
 Regras obrigatórias:
 - Linguagem técnico-jurídica, impessoal, terceira pessoa
 - NÃO invente achados não informados
-- Dados insuficientes: escreva "sem elementos para afirmar ou negar"
-- Não inclua quesitos, cabeçalhos ou outros campos — apenas os 4 blocos acima
-- Não use negrito, markdown ou formatação — texto corrido pronto para colar no sistema`;
+- Dados insuficientes: "sem elementos para afirmar ou negar"
+- Não inclua quesitos, cabeçalhos ou outros campos além dos 4 acima
+- Texto corrido sem markdown, sem negrito, pronto para colar no sistema`;
 }
 
-function parsearBlocos(texto) {
-  const pegar = (marcador) => {
-    const re = new RegExp(`===${marcador}===\\s*([\\s\\S]*?)(?====[A-Z]+===|$)`);
-    const m = texto.match(re);
-    return m ? m[1].trim() : "";
+function parsear(texto) {
+  const pegar = (m) => {
+    const r = new RegExp(`===${m}===\\s*([\\s\\S]*?)(?=====[A-Z]+=|$)`);
+    const match = texto.match(r);
+    return match ? match[1].trim() : '';
   };
   return {
-    historico: pegar("HISTORICO"),
-    exame: pegar("EXAME"),
-    discussao: pegar("DISCUSSAO"),
-    conclusao: pegar("CONCLUSAO"),
+    historico: pegar('HISTORICO'),
+    exame: pegar('EXAME'),
+    discussao: pegar('DISCUSSAO'),
+    conclusao: pegar('CONCLUSAO'),
   };
 }
 
-function CopyButton({ text, label = "Copiar" }) {
-  const [copiado, setCopiado] = useState(false);
-  const copiar = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
+function ajustarAltura(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function preencherBloco(id, texto) {
+  const el = document.getElementById(id);
+  el.value = texto;
+  ajustarAltura(el);
+}
+
+async function gerar() {
+  const chave = document.getElementById('apikey').value.trim();
+  const contexto = document.getElementById('contexto').value.trim();
+  if (!chave) { mostrarErro('Informe a chave de API da Anthropic.'); return; }
+  if (!contexto) { mostrarErro('Descreva o contexto do exame antes de gerar.'); return; }
+  limparErro();
+
+  const btn = document.getElementById('btnGerar');
+  btn.disabled = true;
+  btn.textContent = 'Gerando minuta...';
+  document.getElementById('resultado').style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': chave,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: montarPrompt(contexto) }],
+      }),
     });
-  };
-  return (
-    <button
-      onClick={copiar}
-      disabled={!text}
-      className="text-xs px-3 py-1 rounded border border-gray-400 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors disabled:opacity-40"
-    >
-      {copiado ? "Copiado" : label}
-    </button>
-  );
-}
 
-function Bloco({ titulo, conteudo, onChange }) {
-  return (
-    <div className="border border-gray-300 rounded bg-white">
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-300 rounded-t">
-        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">{titulo}</span>
-        <CopyButton text={conteudo} />
-      </div>
-      <textarea
-        value={conteudo}
-        onChange={e => onChange(e.target.value)}
-        rows={Math.max(4, Math.ceil(conteudo.length / 90))}
-        className="w-full p-3 block-output text-gray-800 resize-y focus:outline-none rounded-b"
-      />
-    </div>
-  );
-}
-
-function App() {
-  const [contexto, setContexto] = useState("");
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("iml_api_key") || "");
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState(null);
-  const [blocos, setBlocos] = useState(null);
-  const [gravando, setGravando] = useState(false);
-  const recRef = useRef(null);
-
-  const salvarKey = (k) => {
-    setApiKey(k);
-    localStorage.setItem("iml_api_key", k);
-  };
-
-  // ── Ditado por voz (Web Speech API) ──
-  const suportaVoz = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
-
-  const toggleVoz = () => {
-    if (gravando) {
-      recRef.current?.stop();
-      return;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Erro HTTP ${res.status}`);
     }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new SR();
-    rec.lang = "pt-BR";
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      let novo = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) novo += e.results[i][0].transcript + " ";
-      }
-      if (novo) setContexto(c => (c ? c + " " : "") + novo.trim());
-    };
-    rec.onend = () => setGravando(false);
-    rec.onerror = (e) => {
-      setGravando(false);
-      if (e.error !== "aborted") setErro(`Erro no ditado: ${e.error}`);
-    };
-    recRef.current = rec;
-    rec.start();
-    setGravando(true);
-    setErro(null);
-  };
 
-  // ── Geração ──
-  const gerar = async () => {
-    if (!apiKey.trim()) { setErro("Informe a chave de API da Anthropic."); return; }
-    if (!contexto.trim()) { setErro("Descreva o contexto do exame antes de gerar."); return; }
-    setErro(null);
-    setCarregando(true);
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: montarPrompt(contexto) }],
-        }),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `Erro HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      const texto = data.content?.[0]?.text || "";
-      const b = parsearBlocos(texto);
-      if (!b.historico && !b.exame && !b.discussao && !b.conclusao) {
-        throw new Error("A resposta não veio no formato esperado. Tente novamente.");
-      }
-      setBlocos(b);
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setCarregando(false);
+    const data = await res.json();
+    const texto = data.content?.[0]?.text || '';
+    const b = parsear(texto);
+
+    if (!b.historico && !b.exame && !b.discussao && !b.conclusao) {
+      throw new Error('Resposta fora do formato esperado. Tente novamente.');
     }
-  };
 
-  const textoCompleto = blocos
-    ? `HISTÓRICO\n${blocos.historico}\n\nEXAME MÉDICO\n${blocos.exame}\n\nDISCUSSÃO\n${blocos.discussao}\n\nCONCLUSÃO\n${blocos.conclusao}`
-    : "";
+    preencherBloco('historico', b.historico);
+    preencherBloco('exame', b.exame);
+    preencherBloco('discussao', b.discussao);
+    preencherBloco('conclusao', b.conclusao);
+    document.getElementById('resultado').style.display = 'block';
+    document.getElementById('resultado').scrollIntoView({ behavior: 'smooth' });
 
-  return (
-    <div className="max-w-2xl mx-auto px-3 py-4">
-      <div className="mb-4 border-b border-gray-300 pb-3">
-        <h1 className="text-base font-bold text-gray-900">Assistente de Laudos Periciais</h1>
-        <p className="text-xs text-gray-500">IML Estácio de Lima — Maceió-AL</p>
-      </div>
-
-      {/* API Key */}
-      <div className="mb-4">
-        <label className="block text-xs font-semibold text-gray-700 mb-1">Chave de API Anthropic</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={e => salvarKey(e.target.value)}
-          placeholder="sk-ant-..."
-          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-        />
-      </div>
-
-      {/* Contexto */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs font-semibold text-gray-700">Contexto do Exame</label>
-          {suportaVoz && (
-            <button
-              onClick={toggleVoz}
-              className={`text-xs px-3 py-1 rounded border font-medium transition-colors ${
-                gravando
-                  ? "bg-red-600 text-white border-red-700 mic-ativo"
-                  : "bg-white text-gray-700 border-gray-400 hover:bg-gray-50"
-              }`}
-            >
-              {gravando ? "Parar ditado" : "Ditar por voz"}
-            </button>
-          )}
-        </div>
-        <textarea
-          value={contexto}
-          onChange={e => setContexto(e.target.value)}
-          rows={8}
-          placeholder="Digite ou dite o contexto do exame: tipo de exame, idade, histórico relatado, achados do exame físico, e demais informações relevantes..."
-          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 resize-y"
-        />
-      </div>
-
-      {erro && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-300 rounded text-xs text-red-800">{erro}</div>
-      )}
-
-      <button
-        onClick={gerar}
-        disabled={carregando}
-        className="w-full py-2.5 mb-5 bg-gray-800 text-white text-sm font-semibold rounded hover:bg-gray-900 disabled:opacity-60 transition-colors"
-      >
-        {carregando ? "Gerando minuta..." : "Gerar Minuta"}
-      </button>
-
-      {/* Resultado */}
-      {blocos && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-800">Minuta Gerada</h2>
-            <CopyButton text={textoCompleto} label="Copiar os 4 campos" />
-          </div>
-          <Bloco titulo="Histórico" conteudo={blocos.historico} onChange={v => setBlocos(b => ({ ...b, historico: v }))} />
-          <Bloco titulo="Exame Médico" conteudo={blocos.exame} onChange={v => setBlocos(b => ({ ...b, exame: v }))} />
-          <Bloco titulo="Discussão" conteudo={blocos.discussao} onChange={v => setBlocos(b => ({ ...b, discussao: v }))} />
-          <Bloco titulo="Conclusão" conteudo={blocos.conclusao} onChange={v => setBlocos(b => ({ ...b, conclusao: v }))} />
-        </div>
-      )}
-
-      <div className="mt-6 pt-3 border-t border-gray-200 text-xs text-gray-400 text-center">
-        Uso exclusivo para apoio à redação técnica. O perito é responsável pela revisão e assinatura do laudo.
-      </div>
-    </div>
-  );
+  } catch(e) {
+    mostrarErro(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Gerar Minuta';
+  }
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+function copiar(id) {
+  const texto = document.getElementById(id).value;
+  navigator.clipboard.writeText(texto).then(() => {
+    const btns = document.querySelectorAll('.bloco-header .btn');
+    btns.forEach(b => { if (b.onclick?.toString().includes(id)) { b.textContent = 'Copiado'; setTimeout(() => b.textContent = 'Copiar', 2000); }});
+  });
+}
+
+function copiarTudo() {
+  const h = document.getElementById('historico').value;
+  const e = document.getElementById('exame').value;
+  const d = document.getElementById('discussao').value;
+  const c = document.getElementById('conclusao').value;
+  const texto = `HISTÓRICO\n${h}\n\nEXAME MÉDICO\n${e}\n\nDISCUSSÃO\n${d}\n\nCONCLUSÃO\n${c}`;
+  navigator.clipboard.writeText(texto).then(() => {
+    const btn = document.querySelector('.resultado-header .btn');
+    btn.textContent = 'Copiado';
+    setTimeout(() => btn.textContent = 'Copiar os 4 campos', 2000);
+  });
+}
 </script>
 </body>
 </html>
