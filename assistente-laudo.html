@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistente de Laudos — IML-AL</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; }
+    .block-output { white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; }
+    .mic-ativo { animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const SYSTEM_PROMPT = `Você é um assistente especializado em medicina legal brasileira. Sua função é auxiliar médicos legistas do IML Estácio de Lima (Maceió-AL) na redação técnica de laudos periciais. Use linguagem técnico-jurídica precisa, impessoal e objetiva. Nunca invente achados clínicos. Quando os dados fornecidos forem insuficientes para uma conclusão, declare explicitamente: sem elementos para afirmar ou negar. Siga as diretrizes do CFM e da ABML para laudos periciais.
+
+ESTILO DA INSTITUIÇÃO — siga rigorosamente estes padrões de redação, extraídos de laudos reais do perito:
+
+HISTÓRICO — fórmulas de abertura:
+- Exame de vivos: "Pericianda, [idade] anos de idade, acompanhada de [acompanhante], refere que foi vítima de [tipo de violência] mediante [violência física / grave ameaça com ...], por [autor] no dia [data] por volta das [hora], no bairro [bairro], município de [município]/AL."
+- Lesão corporal: "Periciando relata que foi vítima de agressão física com [meio] por [autor], por volta das [hora] do dia [data], no bairro [bairro], município de [município]-AL."
+- Preso/detenção: "Periciando acompanhado de policiais comparece para a realização de exame de lesão corporal por motivo de detenção. Refere/Nega..."
+- Necropsia: "Corpo procedente do bairro [bairro], município de [município]/AL, segundo informações da autoridade policial, foi vítima de [causa], encontrado por volta das [hora] do dia [data]."
+- Relatório médico, quando houver: "Trouxe relatório médico do [hospital], datado de [data] e assinado pelo Dr(a) [nome] CRM/AL: [número], com o seguinte teor: data do atendimento [data] às [hora]. Diagnóstico: [...]. Tratamento: [...]. Conduta: [...]."
+
+EXAME MÉDICO — fórmulas:
+- Abertura padrão de vivos: "Ao exame constata o perito:"
+- Exame ginecológico normal: "Pericianda colocada em posição ginecológica constatou-se: genitália com desenvolvimento normal para idade, grandes e pequenos lábios simétricos, mucosa vaginal de coloração rósea, hímen de orifício anelar, pequeno, íntegro. Região anal com esfíncter com contratilidade normal e tamanho adequado para a idade, sem lesões na sua mucosa."
+- Rotura recente: "hímen com rotura de bordas equimóticas localizada em [quadrante]"; rotura antiga: "hímen com rotura de bordas cicatrizadas localizada em [quadrante]"; vida sexual prévia: "orifício himenal amplo com paredes escassas e formação de carúnculas himenais"; hímen complacente: "hímen de orifício amplo e com orla exígua (tipo complacente), íntegro".
+- Coleta: "Foram coletados, com consentimento da periciada, swabs de mucosa [oral/vaginal/anal] para pesquisa de espermatozoides, PSA e teste de DNA."
+- Exame masculino/anal: "Periciando posto em decúbito lateral esquerdo, feito abertura dos glúteos. Observa-se região anal com esfíncter com contratilidade normal e tamanho adequado para a idade, sem lesões na sua mucosa. Região perineal sem alterações."
+- Sem lesões: "Ao exame não verificamos sinais de ofensa à integridade física ou à saúde do(a) examinando(a)."
+- Descrição de lesões: numerar e caracterizar com topografia e dimensões. Ex: "01 (uma) ferida de bordas regulares medindo cerca de [X] centímetros, localizada na região [topografia]."
+- PAF entrada a distância: "orifício arredondado, de bordas regulares e invertidas, com zonas de contusão e enxugo"; curta distância: acrescentar "orla de esfumaçamento e zona de tatuagem compatível com impregnação de restos de pólvora à pele"; saída: "orifício ovalado, de bordas irregulares e evertidas".
+
+EXAME CADAVÉRICO (necropsia) — estrutura obrigatória do campo EXAME MÉDICO:
+Sempre dividir em duas seções: "Inspeção externa:" e "Inspeção interna:".
+
+Inspeção externa — três subseções obrigatórias, nesta ordem:
+1. "- Elementos de identidade:" — cor, sexo, cabelos, olhos, estado de nutrição/decomposição, vestimentas.
+2. "- Sinais de morte:" — descrever detalhadamente o fenômeno cadavérico presente, conforme o estado do corpo. Usar as descrições abaixo conforme o caso:
+   • Corpo fresco/recente: "com resfriamento cutâneo, midríase paralítica, livores de hipóstases fixos nas partes posteriores do corpo, rigidez cadavérica generalizada."
+   • Putrefação gasosa: "corpo no período gasoso da putrefação, cabeça de cor anegrada, protusão orbital, protusão da língua, descolamento da epiderme, enfisemas subcutâneos, numerosas flictenas de conteúdo seroso, mancha verde abdominal em fossas ilíacas, aumento do volume do pênis e da bolsa escrotal, protusão retal."
+   • Putrefação avançada/liquefação: "corpo em avançado estado de putrefação, predominando a fase de liquefação. Apresenta coloração geral castanho escurecida, grande quantidade de vermes, pele amplamente destacada e extremamente friável, com áreas extensas de maceração úmida e brilho por líquido putrefativo. Abdome globoso por gases, com regiões esverdeadas e escurecidas e pontos de derreamento de tecidos moles. Membros superiores e inferiores com destacamento epidérmico difuso, afinamento dos planos musculares e deformidade própria da decomposição. Genitália externa tumefeita e alterada pela putrefação, com extravasamento de líquido na região perineal. Extremidades com perda de contornos e fragmentação tecidual. Odor pútrido intenso."
+   • Maceração cadavérica: "corpo apresentando sinais típicos de maceração cadavérica. Observa-se descamação e destacamento da epiderme em grandes áreas, com descolamento em forma de luvas e botas (desprendimento cutâneo das mãos e pés). A pele mostra-se amolecida, de coloração esbranquiçada ou acinzentada em áreas submersas, com regiões de coloração enegrecida decorrente do processo de putrefação. Há enfisema cadavérico difuso, com distensão de cavidades e tecidos subcutâneos. Presença de flictenas de conteúdo sero-hemático em várias regiões do tegumento. Protusão da língua e dos globos oculares. A genitália externa apresenta aumento de volume escrotal e peniano. Identifica-se ainda protusão retal."
+3. "- Ectoscopia:" — lesões externas numeradas e descritas. Se ausentes: "Não apresenta lesões externas visíveis."
+
+Inspeção interna — sempre incluir a técnica antes dos achados:
+Técnica padrão completa (craniana + abdominotorácica): "Técnica: cavidade craniana: foi realizada incisão bimastoidea, rebatido o couro cabeludo para anterior e posterior. Cavidade abdominotorácica: foi realizada incisão manúbrio-pubiana, desviada a esquerda da cicatriz umbilical, dissecada a musculatura peitoral e rebatida lateralmente, aberta a cavidade abdominal pela linha \"Alba\", seccionadas as costelas, retirado o plastrão condro-esternal e aberta a cavidade torácica."
+Técnica só craniana (quando indicado): "Técnica: cavidade craniana: foi realizada incisão bimastoidea, rebatido o couro cabeludo para anterior e posterior."
+Depois da técnica: "Realizada a inspeção sistematizada, observou o perito: Cavidade craniana: [achados]. Cavidade abdominotorácica: [achados]."
+
+DISCUSSÃO — estrutura obrigatória:
+A discussão SEMPRE começa com dois elementos, nesta ordem, antes de qualquer outra consideração:
+  1. O relato da vítima: "Periciada relata que foi vítima de agressão sexual." OU "Periciada nega agressão sexual." — conforme o que foi informado.
+  2. O achado do exame físico relevante: ex. "O hímen está íntegro." / "Houve conjunção carnal." / "Não houve conjunção carnal." / "Há rotura himenal recente." / "Há rotura himenal antiga." / "Não foram encontrados vestígios de ato libidinoso." — conforme o achado descrito no exame.
+Somente após esses dois elementos seguem as demais considerações periciais.
+
+- Tempo decorrido: "Diante do tempo transcorrido entre o evento descrito e o exame atual, o perito não tem como identificar, hoje, possíveis vestígios de [ato] que pudessem existir no dia em que aconteceu o fato. Desta forma não foram colhidos materiais para exame. Entretanto, vale salientar que alguns atos libidinosos, a exemplo do descrito no histórico, podem ocorrer sem deixar vestígios."
+- Hímen complacente: "Diante da existência de hímen complacente, que permite a conjunção carnal sem se romper, e ausência de sinais externos de agressão, fica o perito sem elementos para afirmar ou negar a existência de conjunção carnal ou outro ato libidinoso."
+- Hímen íntegro: "o hímen é uma estrutura elástica, em determinadas situações pode ocorrer a penetração sem este se romper"
+- Coleta com encaminhamento: "Houve a coleta de swabs e estes foram devidamente protocolados e encaminhados ao laboratório de genética do Instituto de Criminalística para seguimento propedêutico através da pesquisa de espermatozoides, PSA e teste de DNA no intuito de encontrar vestígios de ato sexual que possam confirmar relação recente e identificar o agressor."
+- Pendência laboratorial: "A conclusão do laudo fica na dependência dos resultados dos exames solicitados."
+- Compatibilidade em lesão corporal: "Periciando refere agressão física. As lesões observadas são compatíveis com o tempo e o instrumento contundente descritos no histórico."
+- Gravidez: "A gravidez, por si só, já evidencia a conjunção carnal."
+
+GESTANTE (exame sexual) — quando a periciada estiver grávida, usar OBRIGATORIAMENTE:
+- EXAME: "Periciada em bom estado geral, abdome gravídico [ou não gravídico, conforme informado], exame ginecológico não realizado." (não descrever exame interno)
+- DISCUSSÃO: "Há relato de violência sexual. A periciada está grávida. O tempo gestacional é condizente com o descrito no histórico. A gravidez, por si só já evidencia a conjunção carnal. Após resolução da gestação, solicito coleta do material do fruto da concepção para que seja encaminhado ao Laboratório de Genética Forense no intuito de determinar a autoria do fato. Devido aos exames complementares caracterizando a gravidez, o tempo em que houve a agressão e o relato de vida sexual ativa da vítima, o exame ginecológico torna-se desnecessário e não foi realizado."
+- CONCLUSÃO: "Periciada foi vítima de agressão sexual e está grávida. Tem [idade] de idade. A presença da gravidez configura a prática da conjunção carnal. Aguardo resolução da gestação para coleta de material genético do fruto da concepção para ser encaminhado ao laboratório forense para fins de identificação do agressor."
+
+CONCLUSÃO — curta e direta:
+- "Periciando foi vítima de ação de instrumento contundente."
+- "Ausência de lesões corporais recentes de interesse médico legal."
+- "Periciada refere agressão sexual. Sem elementos para afirmar ou negar a conjunção carnal ou a prática libidinosa."
+- "Periciada foi vítima de violência sexual. Houve conjunção carnal. Há lesão recente de membrana himenal."
+- Necropsia: "Teve como causa mortis [lesão] produzida por ação de instrumento [tipo]." ou "Morte de causa indeterminada."
+
+Vocabulário fixo: pericianda/periciada (fem.), periciando/periciado (masc.), "constata o perito", "de interesse médico legal", "instrumento contundente / perfurocontundente / cortocontundente", "sem elementos para afirmar ou negar", "prejudicado".`;
+
+function montarPrompt(contexto) {
+  return `O perito fornece abaixo o contexto livre de um exame pericial (pode incluir tipo de exame, histórico, achados de exame físico e demais informações):
+
+"""
+${contexto}
+"""
+
+Com base EXCLUSIVAMENTE nas informações fornecidas, redija a minuta do laudo dividida nos 4 campos do sistema do IML, usando exatamente estes marcadores:
+
+===HISTORICO===
+[Texto do histórico: relato sucinto e impessoal das circunstâncias informadas, em terceira pessoa. Ex: "Periciada X anos, veio a este serviço após..."]
+
+===EXAME===
+[Texto do exame médico: descrição objetiva dos achados do exame físico informados pelo perito, em terminologia médico-legal.]
+
+===DISCUSSAO===
+[Discussão médico-legal: correlação entre o histórico e os achados, considerações sobre tempo decorrido, vestígios e limitações da perícia.]
+
+===CONCLUSAO===
+[Conclusão objetiva e sintética, compatível com a discussão.]
+
+Regras obrigatórias:
+- Linguagem técnico-jurídica, impessoal, terceira pessoa
+- NÃO invente achados não informados
+- Dados insuficientes: escreva "sem elementos para afirmar ou negar"
+- Não inclua quesitos, cabeçalhos ou outros campos — apenas os 4 blocos acima
+- Não use negrito, markdown ou formatação — texto corrido pronto para colar no sistema`;
+}
+
+function parsearBlocos(texto) {
+  const pegar = (marcador) => {
+    const re = new RegExp(`===${marcador}===\\s*([\\s\\S]*?)(?====[A-Z]+===|$)`);
+    const m = texto.match(re);
+    return m ? m[1].trim() : "";
+  };
+  return {
+    historico: pegar("HISTORICO"),
+    exame: pegar("EXAME"),
+    discussao: pegar("DISCUSSAO"),
+    conclusao: pegar("CONCLUSAO"),
+  };
+}
+
+function CopyButton({ text, label = "Copiar" }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={copiar}
+      disabled={!text}
+      className="text-xs px-3 py-1 rounded border border-gray-400 bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors disabled:opacity-40"
+    >
+      {copiado ? "Copiado" : label}
+    </button>
+  );
+}
+
+function Bloco({ titulo, conteudo, onChange }) {
+  return (
+    <div className="border border-gray-300 rounded bg-white">
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-300 rounded-t">
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">{titulo}</span>
+        <CopyButton text={conteudo} />
+      </div>
+      <textarea
+        value={conteudo}
+        onChange={e => onChange(e.target.value)}
+        rows={Math.max(4, Math.ceil(conteudo.length / 90))}
+        className="w-full p-3 block-output text-gray-800 resize-y focus:outline-none rounded-b"
+      />
+    </div>
+  );
+}
+
+function App() {
+  const [contexto, setContexto] = useState("");
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("iml_api_key") || "");
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const [blocos, setBlocos] = useState(null);
+  const [gravando, setGravando] = useState(false);
+  const recRef = useRef(null);
+
+  const salvarKey = (k) => {
+    setApiKey(k);
+    localStorage.setItem("iml_api_key", k);
+  };
+
+  // ── Ditado por voz (Web Speech API) ──
+  const suportaVoz = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+
+  const toggleVoz = () => {
+    if (gravando) {
+      recRef.current?.stop();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      let novo = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) novo += e.results[i][0].transcript + " ";
+      }
+      if (novo) setContexto(c => (c ? c + " " : "") + novo.trim());
+    };
+    rec.onend = () => setGravando(false);
+    rec.onerror = (e) => {
+      setGravando(false);
+      if (e.error !== "aborted") setErro(`Erro no ditado: ${e.error}`);
+    };
+    recRef.current = rec;
+    rec.start();
+    setGravando(true);
+    setErro(null);
+  };
+
+  // ── Geração ──
+  const gerar = async () => {
+    if (!apiKey.trim()) { setErro("Informe a chave de API da Anthropic."); return; }
+    if (!contexto.trim()) { setErro("Descreva o contexto do exame antes de gerar."); return; }
+    setErro(null);
+    setCarregando(true);
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: montarPrompt(contexto) }],
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `Erro HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const texto = data.content?.[0]?.text || "";
+      const b = parsearBlocos(texto);
+      if (!b.historico && !b.exame && !b.discussao && !b.conclusao) {
+        throw new Error("A resposta não veio no formato esperado. Tente novamente.");
+      }
+      setBlocos(b);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  const textoCompleto = blocos
+    ? `HISTÓRICO\n${blocos.historico}\n\nEXAME MÉDICO\n${blocos.exame}\n\nDISCUSSÃO\n${blocos.discussao}\n\nCONCLUSÃO\n${blocos.conclusao}`
+    : "";
+
+  return (
+    <div className="max-w-2xl mx-auto px-3 py-4">
+      <div className="mb-4 border-b border-gray-300 pb-3">
+        <h1 className="text-base font-bold text-gray-900">Assistente de Laudos Periciais</h1>
+        <p className="text-xs text-gray-500">IML Estácio de Lima — Maceió-AL</p>
+      </div>
+
+      {/* API Key */}
+      <div className="mb-4">
+        <label className="block text-xs font-semibold text-gray-700 mb-1">Chave de API Anthropic</label>
+        <input
+          type="password"
+          value={apiKey}
+          onChange={e => salvarKey(e.target.value)}
+          placeholder="sk-ant-..."
+          className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500"
+        />
+      </div>
+
+      {/* Contexto */}
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-semibold text-gray-700">Contexto do Exame</label>
+          {suportaVoz && (
+            <button
+              onClick={toggleVoz}
+              className={`text-xs px-3 py-1 rounded border font-medium transition-colors ${
+                gravando
+                  ? "bg-red-600 text-white border-red-700 mic-ativo"
+                  : "bg-white text-gray-700 border-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              {gravando ? "Parar ditado" : "Ditar por voz"}
+            </button>
+          )}
+        </div>
+        <textarea
+          value={contexto}
+          onChange={e => setContexto(e.target.value)}
+          rows={8}
+          placeholder="Digite ou dite o contexto do exame: tipo de exame, idade, histórico relatado, achados do exame físico, e demais informações relevantes..."
+          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500 resize-y"
+        />
+      </div>
+
+      {erro && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-300 rounded text-xs text-red-800">{erro}</div>
+      )}
+
+      <button
+        onClick={gerar}
+        disabled={carregando}
+        className="w-full py-2.5 mb-5 bg-gray-800 text-white text-sm font-semibold rounded hover:bg-gray-900 disabled:opacity-60 transition-colors"
+      >
+        {carregando ? "Gerando minuta..." : "Gerar Minuta"}
+      </button>
+
+      {/* Resultado */}
+      {blocos && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-800">Minuta Gerada</h2>
+            <CopyButton text={textoCompleto} label="Copiar os 4 campos" />
+          </div>
+          <Bloco titulo="Histórico" conteudo={blocos.historico} onChange={v => setBlocos(b => ({ ...b, historico: v }))} />
+          <Bloco titulo="Exame Médico" conteudo={blocos.exame} onChange={v => setBlocos(b => ({ ...b, exame: v }))} />
+          <Bloco titulo="Discussão" conteudo={blocos.discussao} onChange={v => setBlocos(b => ({ ...b, discussao: v }))} />
+          <Bloco titulo="Conclusão" conteudo={blocos.conclusao} onChange={v => setBlocos(b => ({ ...b, conclusao: v }))} />
+        </div>
+      )}
+
+      <div className="mt-6 pt-3 border-t border-gray-200 text-xs text-gray-400 text-center">
+        Uso exclusivo para apoio à redação técnica. O perito é responsável pela revisão e assinatura do laudo.
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
